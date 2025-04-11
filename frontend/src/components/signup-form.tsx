@@ -1,18 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import Link from "next/link"
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 export function SignupForm({
@@ -57,7 +57,11 @@ export function SignupForm({
       // Redirect to login page after successful registration
       router.push("/login");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Registration failed. Please try again.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Registration failed. Please try again.",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -140,5 +144,5 @@ export function SignupForm({
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

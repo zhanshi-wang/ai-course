@@ -1,14 +1,13 @@
-import { NextRequest, NextResponse } from "next/server"
-import { BACKEND_URL } from "@/lib/api-utils"
-
+import { NextRequest, NextResponse } from "next/server";
+import { BACKEND_URL } from "@/lib/api-utils";
 
 export async function POST(request: NextRequest) {
   try {
-    const formData = await request.formData()
+    const formData = await request.formData();
 
-    const body = new URLSearchParams()
-    body.append("username", formData.get("username") as string)
-    body.append("password", formData.get("password") as string)
+    const body = new URLSearchParams();
+    body.append("username", formData.get("username") as string);
+    body.append("password", formData.get("password") as string);
 
     const response = await fetch(`${BACKEND_URL}/auth/token`, {
       method: "POST",
@@ -16,18 +15,18 @@ export async function POST(request: NextRequest) {
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body,
-    })
+    });
 
-    const data = await response.json()
+    const data = await response.json();
 
     if (!response.ok) {
-      return NextResponse.json(data, { status: response.status })
+      return NextResponse.json(data, { status: response.status });
     }
 
     const cookieResponse = NextResponse.json(
       { success: true },
-      { status: 200 }
-    )
+      { status: 200 },
+    );
 
     cookieResponse.cookies.set({
       name: "auth_token",
@@ -37,14 +36,14 @@ export async function POST(request: NextRequest) {
       sameSite: "lax",
       maxAge: 1800,
       path: "/",
-    })
+    });
 
-    return cookieResponse
+    return cookieResponse;
   } catch (error) {
-    console.error("Login error:", error)
+    console.error("Login error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
-    )
+      { status: 500 },
+    );
   }
 }

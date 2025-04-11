@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 
-
 const protectedRoutes = ["/files", "/chat"];
 const publicRoutes = ["/login", "/signup"];
 
@@ -12,12 +11,12 @@ export default function middleware(request: NextRequest) {
   const token = request.cookies.get("auth_token");
 
   if (isProtectedRoute && !token) {
-    return NextResponse.redirect(new URL("/login", request.url))
+    return NextResponse.redirect(new URL("/login", request.url));
   }
 
   if (isPublicRoute && token) {
-    return NextResponse.redirect(new URL("/chat", request.url))
+    return NextResponse.redirect(new URL("/chat", request.url));
   }
 
-  return NextResponse.next()
+  return NextResponse.next();
 }

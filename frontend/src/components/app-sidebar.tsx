@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { ChevronUp, Inbox, User2, LogOut, MessageCircle } from "lucide-react"
+import { ChevronUp, Inbox, User2, LogOut, MessageCircle } from "lucide-react";
 
 import {
   Sidebar,
@@ -12,8 +12,13 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu"
+} from "@/components/ui/sidebar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 import { useAuth } from "@/contexts/auth-context";
 
 // Menu items.
@@ -28,7 +33,7 @@ const items = [
     url: "/files",
     icon: Inbox,
   },
-]
+];
 
 export function AppSidebar() {
   const { user, logout } = useAuth();
@@ -81,5 +86,5 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
-  )
+  );
 }
