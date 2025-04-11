@@ -3,11 +3,12 @@ from typing import Annotated
 import uuid
 from backend.database import db_dependency
 from backend.models import File, User
-from backend.routers.auth import get_current_user
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.exc import SQLAlchemyError
+
+from backend.routers.auth import get_current_user_from_cookie
 
 
 UPLOAD_DIR = "files"
@@ -25,9 +26,9 @@ class FileMetadataResponse(BaseModel):
     size: int
 
 
-@router.get("/", response_model=list[FileMetadataResponse])
+@router.get("", response_model=list[FileMetadataResponse])
 async def list_files(
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_current_user_from_cookie)],
     db: db_dependency,
 ):
     files = db.query(File).filter(File.user_id == current_user.id).all()
@@ -35,11 +36,11 @@ async def list_files(
 
 
 @router.post(
-    "/", response_model=FileMetadataResponse, status_code=status.HTTP_201_CREATED
+    "", response_model=FileMetadataResponse, status_code=status.HTTP_201_CREATED
 )
 async def upload_file(
     file: UploadFile,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_current_user_from_cookie)],
     db: db_dependency,
 ):
     try:
@@ -81,7 +82,7 @@ async def upload_file(
 @router.get("/{file_id}/download")
 async def download_file(
     file_id: uuid.UUID,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_current_user_from_cookie)],
     db: db_dependency,
 ):
     file = db.query(File).filter(File.id == file_id).first()
@@ -111,7 +112,7 @@ async def download_file(
 @router.delete("/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_file(
     file_id: uuid.UUID,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_current_user_from_cookie)],
     db: db_dependency,
 ):
     file = db.query(File).filter(File.id == file_id).first()

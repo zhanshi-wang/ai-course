@@ -9,8 +9,15 @@ import { toast } from "sonner";
 import { useEffect } from "react";
 import { DataTable } from "@/components/data-table";
 import { ColumnDef } from "@tanstack/react-table";
-import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, Upload } from "lucide-react";
 import { DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { DialogContent } from "@/components/ui/dialog";
@@ -18,13 +25,15 @@ import { DialogTitle } from "@/components/ui/dialog";
 import { DialogHeader } from "@/components/ui/dialog";
 import { DialogTrigger } from "@/components/ui/dialog";
 import { Dialog } from "@/components/ui/dialog";
-
+import { BACKEND_PUBLIC_URL } from "@/lib/api-utils";
 export default function Files() {
   const [files, setFiles] = useState<FileMetadata[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   useEffect(() => {
     const fetchFiles = async () => {
-      const res = await fetch("/api/files");
+      const res = await fetch(`${BACKEND_PUBLIC_URL}/files`, {
+        credentials: "include",
+      });
       if (!res.ok) {
         toast.error("Failed to fetch files");
         return;
@@ -45,9 +54,10 @@ export default function Files() {
     const formData = new FormData();
     formData.append("file", file);
 
-    const res = await fetch("/api/files", {
+    const res = await fetch(`${BACKEND_PUBLIC_URL}/files`, {
       method: "POST",
       body: formData,
+      credentials: "include",
     });
 
     if (!res.ok) {
@@ -60,8 +70,9 @@ export default function Files() {
   };
 
   const handleFileDelete = async (fileId: string) => {
-    const res = await fetch(`/api/files/${fileId}`, {
+    const res = await fetch(`${BACKEND_PUBLIC_URL}/files/${fileId}`, {
       method: "DELETE",
+      credentials: "include",
     });
 
     if (!res.ok) {
@@ -101,7 +112,12 @@ export default function Files() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem
-                onClick={() => window.open(`/api/files/${file.id}/download`, '_blank')}
+                onClick={() =>
+                  window.open(
+                    `${BACKEND_PUBLIC_URL}/files/${file.id}/download`,
+                    "_blank",
+                  )
+                }
               >
                 Download
               </DropdownMenuItem>
@@ -114,8 +130,8 @@ export default function Files() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        )
-      }
+        );
+      },
     },
   ];
 
