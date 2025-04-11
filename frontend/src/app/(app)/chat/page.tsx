@@ -10,7 +10,18 @@ type Message = {
   content: string;
   sender_type: "user" | "assistant";
   createdAt: Date;
+  isComplete: boolean;
 };
+
+
+type ChunkType = "start" | "chunk" | "end";
+
+type MessageChunk = {
+  message_id: string;
+  type: ChunkType;
+  content?: string;
+};
+
 
 export default function Chat() {
   const [currentWs, setCurrentWs] = useState<WebSocket>();
@@ -36,15 +47,40 @@ export default function Chat() {
     };
 
     ws.onmessage = (event) => {
-      setMessages((prevMessages) => [
-        ...prevMessages,
-        {
-          id: crypto.randomUUID(),
-          content: event.data,
-          sender_type: "assistant",
-          createdAt: new Date(),
-        },
-      ]);
+      const messageChunk = JSON.parse(event.data) as MessageChunk;
+
+      console.log(messageChunk);
+
+      if (messageChunk.type === "start") {
+        setMessages((prevMessages) => [
+          ...prevMessages,
+          {
+            id: messageChunk.message_id,
+            content: "",
+            sender_type: "assistant",
+            createdAt: new Date(),
+            isComplete: false,
+          },
+        ]);
+      } else if (messageChunk.type === "chunk") {
+        setMessages((prevMessages) => {
+          return prevMessages.map((message) => {
+            if (message.id === messageChunk.message_id) {
+              message.content += messageChunk.content;
+            }
+            return message;
+          });
+        });
+      } else if (messageChunk.type === "end") {
+        setMessages((prevMessages) => {
+          return prevMessages.map((message) => {
+            if (message.id === messageChunk.message_id) {
+              message.isComplete = true;
+            }
+            return message;
+          });
+        });
+      }
     };
 
     ws.onerror = () => {
@@ -77,6 +113,7 @@ export default function Chat() {
         content: input,
         sender_type: "user",
         createdAt: new Date(),
+        isComplete: false,
       },
     ]);
     setInput("");
@@ -143,6 +180,9 @@ export default function Chat() {
                   }`}
               >
                 {message.content}
+                {!message.isComplete && message.sender_type === "assistant" && (
+                  <span className="ml-1 animate-pulse">▌</span>
+                )}
               </div>
               <div className="text-xs text-muted-foreground mt-1">
                 {message.createdAt.toLocaleTimeString()}

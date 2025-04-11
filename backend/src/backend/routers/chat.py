@@ -1,5 +1,8 @@
+import asyncio
+import os
+import uuid
 import jwt
-from typing import Annotated
+from typing import Annotated, Any
 from fastapi import (
     APIRouter,
     WebSocket,
@@ -12,9 +15,15 @@ from backend.database import db_dependency
 from backend.routers.auth import get_user, TokenData
 from backend.routers.auth import SECRET_KEY, ALGORITHM
 from backend.models import User
+from openai import AsyncOpenAI
+import logging
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ws", tags=["websocket"])
+
+
+openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 class ConnectionManager:
@@ -30,10 +39,17 @@ class ConnectionManager:
     ):
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
-            await websocket.close(code=code)
+            try:
+                await websocket.close(code=code)
+            except RuntimeError:
+                # WebSocket already closed
+                pass
 
     async def send_message(self, message: str, websocket: WebSocket):
         await websocket.send_text(message)
+
+    async def send_json(self, data: Any, websocket: WebSocket):
+        await websocket.send_json(data)
 
 
 manager = ConnectionManager()
@@ -78,6 +94,45 @@ async def websocket_endpoint(
     try:
         while True:
             data = await websocket.receive_text()
-            await manager.send_message(data + " user: " + current_user.name, websocket)
+
+            stream = await openai_client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "user", "content": data},
+                ],
+                stream=True,
+            )
+
+            message_id = str(uuid.uuid4())
+
+            await manager.send_json(
+                {
+                    "message_id": message_id,
+                    "type": "start",
+                },
+                websocket,
+            )
+            async for chunk in stream:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    logger.info(chunk.choices[0].delta.content)
+                    content = chunk.choices[0].delta.content
+                    await manager.send_json(
+                        {
+                            "message_id": message_id,
+                            "type": "chunk",
+                            "content": content,
+                        },
+                        websocket,
+                    )
+                    await asyncio.sleep(0.01)
+
+            await manager.send_json(
+                {
+                    "message_id": message_id,
+                    "type": "end",
+                },
+                websocket,
+            )
+
     except WebSocketDisconnect:
         await manager.disconnect(websocket)
