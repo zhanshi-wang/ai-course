@@ -2,6 +2,7 @@ import os
 from typing import Annotated
 import uuid
 from backend.database import db_dependency
+from backend.document_parser import parse_pdf
 from backend.models import File, User
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
@@ -9,7 +10,6 @@ from pydantic import BaseModel
 from sqlalchemy.exc import SQLAlchemyError
 
 from backend.routers.auth import get_current_user
-from backend.document_parser import parse_pdf
 
 
 UPLOAD_DIR = "files"
@@ -148,3 +148,37 @@ async def delete_file(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete file",
         )
+
+
+@router.post("/{file_id}/parse")
+async def parse_file(
+    file_id: uuid.UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: db_dependency,
+):
+    file = db.query(File).filter(File.id == file_id).first()
+
+    if not file:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="File not found"
+        )
+
+    if file.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this file",
+        )
+
+    file_path = os.path.join(UPLOAD_DIR, str(file_id))
+    if not os.path.exists(file_path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File content not found",
+        )
+
+    with open(file_path, "rb") as f:
+        pdf_bytes = f.read()
+
+    parsed_document = await parse_pdf(pdf_bytes)
+
+    return parsed_document
