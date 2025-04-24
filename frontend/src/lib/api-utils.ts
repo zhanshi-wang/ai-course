@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export const BACKEND_URL = "http://backend:8000";
-export const BACKEND_PUBLIC_URL = "http://localhost:8000";
+export const BACKEND_PUBLIC_URL = "http://localhost:3000/xapi";
 export const BACKEND_PUBLIC_WS_URL = "ws://localhost:8000";
 
 type BackendRequestOptions = {

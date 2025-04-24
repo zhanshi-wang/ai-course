@@ -8,7 +8,8 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.exc import SQLAlchemyError
 
-from backend.routers.auth import get_current_user_from_cookie
+from backend.routers.auth import get_current_user
+from backend.document_parser import parse_pdf
 
 
 UPLOAD_DIR = "files"
@@ -28,7 +29,7 @@ class FileMetadataResponse(BaseModel):
 
 @router.get("", response_model=list[FileMetadataResponse])
 async def list_files(
-    current_user: Annotated[User, Depends(get_current_user_from_cookie)],
+    current_user: Annotated[User, Depends(get_current_user)],
     db: db_dependency,
 ):
     files = db.query(File).filter(File.user_id == current_user.id).all()
@@ -36,11 +37,13 @@ async def list_files(
 
 
 @router.post(
-    "", response_model=FileMetadataResponse, status_code=status.HTTP_201_CREATED
+    "",
+    response_model=FileMetadataResponse,
+    status_code=status.HTTP_201_CREATED,
 )
 async def upload_file(
     file: UploadFile,
-    current_user: Annotated[User, Depends(get_current_user_from_cookie)],
+    current_user: Annotated[User, Depends(get_current_user)],
     db: db_dependency,
 ):
     try:
@@ -82,7 +85,7 @@ async def upload_file(
 @router.get("/{file_id}/download")
 async def download_file(
     file_id: uuid.UUID,
-    current_user: Annotated[User, Depends(get_current_user_from_cookie)],
+    current_user: Annotated[User, Depends(get_current_user)],
     db: db_dependency,
 ):
     file = db.query(File).filter(File.id == file_id).first()
@@ -101,7 +104,8 @@ async def download_file(
     file_path = os.path.join(UPLOAD_DIR, str(file_id))
     if not os.path.exists(file_path):
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="File content not found"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File content not found",
         )
 
     return FileResponse(
@@ -112,15 +116,10 @@ async def download_file(
 @router.delete("/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_file(
     file_id: uuid.UUID,
-    current_user: Annotated[User, Depends(get_current_user_from_cookie)],
+    current_user: Annotated[User, Depends(get_current_user)],
     db: db_dependency,
 ):
     file = db.query(File).filter(File.id == file_id).first()
-
-    if not file:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="File not found"
-        )
 
     if not file:
         raise HTTPException(

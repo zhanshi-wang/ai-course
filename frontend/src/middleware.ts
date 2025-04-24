@@ -18,5 +18,21 @@ export default function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/chat", request.url));
   }
 
+  if (path.startsWith("/xapi")) {
+    // Create a new request with the Authorization header if we have a token
+    if (token) {
+      const headers = new Headers(request.headers);
+      headers.set("Authorization", `Bearer ${token.value}`);
+      console.log("headers", headers);
+
+      // Return a new response with the added header
+      return NextResponse.next({
+        request: {
+          headers,
+        },
+      });
+    }
+  }
+
   return NextResponse.next();
 }
