@@ -15,6 +15,7 @@ from backend.database import db_dependency
 from backend.routers.auth import get_user, TokenData
 from backend.routers.auth import SECRET_KEY, ALGORITHM
 from backend.models import User
+from backend.chroma import search_vector_db
 from openai import AsyncOpenAI
 import logging
 
@@ -51,6 +52,28 @@ class ConnectionManager:
     async def send_json(self, data: Any, websocket: WebSocket):
         await websocket.send_json(data)
 
+    async def send_full_message(self, message: str, websocket: WebSocket):
+        message_id = str(uuid.uuid4())
+        await websocket.send_json(
+            {
+                "message_id": message_id,
+                "type": "start",
+            }
+        )
+        await websocket.send_json(
+            {
+                "message_id": message_id,
+                "type": "chunk",
+                "content": message,
+            }
+        )
+        await websocket.send_json(
+            {
+                "message_id": message_id,
+                "type": "end",
+            }
+        )
+
 
 manager = ConnectionManager()
 
@@ -85,6 +108,31 @@ async def ws_get_current_user(
     return user
 
 
+async def get_context_from_files(query: str, user_id: uuid.UUID) -> str:
+    """Retrieve relevant context from user's files based on query"""
+    try:
+        # Search vector DB for relevant context
+        search_results = await search_vector_db(query=query, top_k=5, user_id=user_id)
+        logger.info(f"Search results: {search_results}")
+        # Format the results as context
+        if not search_results:
+            return ""
+
+        context_parts = []
+        for i, result in enumerate(search_results):
+            metadata = result["metadata"]
+            file_name = metadata.get("file_name", "Unknown")
+            context_parts.append(
+                f"Document: {file_name}\n" f"Content: {result['content']}\n"
+            )
+
+        context = "\n---\n".join(context_parts)
+        return context
+    except Exception as e:
+        logger.error(f"Error retrieving context: {str(e)}")
+        return ""
+
+
 @router.websocket("/chat")
 async def websocket_endpoint(
     websocket: WebSocket,
@@ -95,11 +143,27 @@ async def websocket_endpoint(
         while True:
             data = await websocket.receive_text()
 
+            # Get relevant context from files
+            await manager.send_full_message("Getting context from files...", websocket)
+            context = await get_context_from_files(data, current_user.id)
+            await manager.send_full_message(f"Context retrieved: {context}", websocket)
+
+            # Prepare messages with context if available
+            sys_msg = "You are a helpful assistant with access to files."
+            messages = [
+                {"role": "system", "content": sys_msg},
+            ]
+
+            if context:
+                context_intro = "Here is relevant information from documents:"
+                system_context = f"{context_intro}\n{context}"
+                messages.append({"role": "system", "content": system_context})
+
+            messages.append({"role": "user", "content": data})
+
             stream = await openai_client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "user", "content": data},
-                ],
+                model="gpt-4.1",
+                messages=messages,
                 stream=True,
             )
 

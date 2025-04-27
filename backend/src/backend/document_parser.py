@@ -2,7 +2,7 @@ import asyncio
 import base64
 from enum import Enum
 import os
-from typing import Dict, List, Literal
+from typing import Any, Dict, List, Literal
 
 from openai import AsyncOpenAI
 
@@ -120,9 +120,7 @@ class AIDocumentParseResponseSchema(BaseModel):
     Response from OpenAI for a single document block.
     """
 
-    blocks: List[AIDocumentBlockSchema] = Field(
-        description="List of document blocks"
-    )
+    blocks: List[AIDocumentBlockSchema] = Field(description="List of document blocks")
 
 
 class DocumentChunk(BaseModel):
@@ -144,6 +142,7 @@ class DocumentChunk(BaseModel):
     blocks: List[DocumentBlock] = Field(
         description="Constituent document blocks that compose this chunk"
     )
+    metadata: Dict[str, Any] = Field(description="Metadata about the chunk")
 
 
 class ParsedDocument(BaseModel):
@@ -359,6 +358,7 @@ async def create_chunks_from_blocks(
     mode: Literal[
         "page", "block"
     ] = "page",  # HOMEWORK: Extend this to support other chunking strategies
+    max_concurrency: int = 10,
 ) -> List[DocumentChunk]:
     """
     Organize blocks into chunks by grouping blocks from the same page and
@@ -366,7 +366,8 @@ async def create_chunks_from_blocks(
 
     Args:
         blocks: List of DocumentBlock objects
-        client: AsyncOpenAI client instance
+        mode: Chunking strategy to use
+        max_concurrency: Maximum number of concurrent API calls
 
     Returns:
         List of DocumentChunk objects
@@ -387,44 +388,62 @@ async def create_chunks_from_blocks(
         # Create a chunk for each page
         chunks = []
 
-        # HOMEWORK: Parallelize this
-        for page_num, page_blocks in pages.items():
-            logger.info(
-                f"Creating chunk for page {page_num} with {len(page_blocks)} blocks"
-            )
-            # Combine all text content
-            content = "\n".join(
-                [block.content for block in page_blocks if block.content]
-            )
+        # Process pages in parallel with controlled concurrency
+        semaphore = asyncio.Semaphore(max_concurrency)
 
-            prompt = """
-            Create a detailed semantic description of this page content
-            optimized for vector embedding and semantic search. Include key
-            concepts, entities, relationships, and main ideas. Be
-            comprehensive but focused.
-            """
-            response = await client.chat.completions.create(
-                model="gpt-4.1-mini-2025-04-14",
-                messages=[
-                    {"role": "system", "content": prompt},
-                    {"role": "user", "content": content},
-                ],
-                temperature=0,
-                max_tokens=1024,
-            )
+        async def process_page(page_num, page_blocks):
+            async with semaphore:
+                logger.info(
+                    f"Creating chunk for page {page_num} with "
+                    f"{len(page_blocks)} blocks"
+                )
+                # Combine all text content
+                content = "\n".join(
+                    [block.content for block in page_blocks if block.content]
+                )
 
-            embed_text = response.choices[0].message.content
-            logger.info(f"Generated embedding text for page {page_num}")
-            chunk = DocumentChunk(
-                content=content, embed=embed_text, blocks=page_blocks
-            )
-            chunks.append(chunk)
+                prompt = """
+                Create a detailed semantic description of this page content
+                optimized for vector embedding and semantic search. Include key
+                concepts, entities, relationships, and main ideas. Be
+                comprehensive but focused.
+                """
+                response = await client.chat.completions.create(
+                    model="gpt-4.1-mini-2025-04-14",
+                    messages=[
+                        {"role": "system", "content": prompt},
+                        {"role": "user", "content": content},
+                    ],
+                    temperature=0,
+                    max_tokens=1024,
+                )
+
+                embed_text = response.choices[0].message.content
+                logger.info(f"Generated embedding text for page {page_num}")
+                return DocumentChunk(
+                    content=content,
+                    embed=embed_text,
+                    blocks=page_blocks,
+                    metadata={"type": "page", "page_num": page_num},
+                )
+
+        # Create tasks for all pages
+        tasks = [
+            process_page(page_num, page_blocks)
+            for page_num, page_blocks in pages.items()
+        ]
+
+        # Gather results
+        chunks = await asyncio.gather(*tasks)
     else:
         chunks = [
             DocumentChunk(
                 content=block.content,
                 embed=block.semantic_content,
                 blocks=[block],
+                metadata={
+                    "type": "block",
+                },
             )
             for block in blocks
         ]
@@ -434,7 +453,7 @@ async def create_chunks_from_blocks(
 
 
 async def parse_pdf(
-    pdf_bytes: bytes,
+    pdf_bytes: bytes, chunking_mode: Literal["page", "block"] = "page"
 ) -> ParsedDocument:
     """
     Parse a PDF document into structured content asynchronously.
@@ -457,7 +476,7 @@ async def parse_pdf(
         blocks = await analyze_with_openai(page_data)
 
         # Organize blocks into chunks
-        chunks = await create_chunks_from_blocks(blocks, mode="page")
+        chunks = await create_chunks_from_blocks(blocks, mode=chunking_mode)
 
         logger.info("Async PDF parsing completed successfully")
         return ParsedDocument(chunks=chunks)

@@ -1,15 +1,23 @@
 import os
 from typing import Annotated
 import uuid
-from backend.database import db_dependency
+from backend.database import db_dependency, SessionLocal
 from backend.document_parser import parse_pdf
 from backend.models import File, User
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    UploadFile,
+    status,
+    BackgroundTasks,
+)
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.exc import SQLAlchemyError
 
 from backend.routers.auth import get_current_user
+from backend.chroma import add_file_to_chromadb, delete_file_from_chromadb
 
 
 UPLOAD_DIR = "files"
@@ -25,6 +33,34 @@ class FileMetadataResponse(BaseModel):
     name: str
     content_type: str
     size: int
+    is_indexed: bool | None
+
+
+async def index_file_in_background(file: File, file_path: str):
+    """Background task to index a file in ChromaDB"""
+    try:
+        # Add file to ChromaDB
+        await add_file_to_chromadb(
+            file=file,
+            file_path=file_path,
+        )
+
+        # Mark the file as indexed in the database
+        db = SessionLocal()
+        try:
+            db_file = db.query(File).filter(File.id == file.id).first()
+            if db_file:
+                db_file.is_indexed = True
+                db.commit()
+        except Exception as e:
+            db.rollback()
+            print(f"Error updating file indexed status: {str(e)}")
+        finally:
+            db.close()
+
+    except Exception as e:
+        # Log the error but continue - background task shouldn't fail
+        print(f"Error adding file to ChromaDB in background: {str(e)}")
 
 
 @router.get("", response_model=list[FileMetadataResponse])
@@ -43,6 +79,7 @@ async def list_files(
 )
 async def upload_file(
     file: UploadFile,
+    background_tasks: BackgroundTasks,
     current_user: Annotated[User, Depends(get_current_user)],
     db: db_dependency,
 ):
@@ -54,6 +91,7 @@ async def upload_file(
             name=file.filename,
             content_type=file.content_type,
             size=len(content),
+            is_indexed=False,
         )
 
         db.add(new_file)
@@ -63,6 +101,13 @@ async def upload_file(
         file_path = os.path.join(UPLOAD_DIR, str(new_file.id))
         with open(file_path, "wb") as f:
             f.write(content)
+
+        # Schedule ChromaDB indexing as a background task
+        background_tasks.add_task(
+            index_file_in_background,
+            file=new_file,
+            file_path=file_path,
+        )
 
         return new_file
     except SQLAlchemyError:
@@ -139,6 +184,8 @@ async def delete_file(
         file_path = os.path.join(UPLOAD_DIR, str(file_id))
         if os.path.exists(file_path):
             os.remove(file_path)
+
+        await delete_file_from_chromadb(file_id)
 
         return None
 

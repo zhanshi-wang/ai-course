@@ -97,6 +97,10 @@ export default function Files() {
       accessorKey: "content_type",
     },
     {
+      header: "Indexed",
+      accessorKey: "is_indexed",
+    },
+    {
       id: "actions",
       header: "Actions",
       cell: ({ row }) => {

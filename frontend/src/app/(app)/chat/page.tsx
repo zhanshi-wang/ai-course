@@ -13,7 +13,6 @@ type Message = {
   isComplete: boolean;
 };
 
-
 type ChunkType = "start" | "chunk" | "end";
 
 type MessageChunk = {
@@ -21,7 +20,6 @@ type MessageChunk = {
   type: ChunkType;
   content?: string;
 };
-
 
 export default function Chat() {
   const [currentWs, setCurrentWs] = useState<WebSocket>();
@@ -152,12 +150,13 @@ export default function Chat() {
       <div className="text-sm mb-2">
         Connection status:{" "}
         <span
-          className={`font-semibold ${connectionStatus === "connected"
-            ? "text-green-500"
-            : connectionStatus === "error"
-              ? "text-red-500"
-              : "text-yellow-500"
-            }`}
+          className={`font-semibold ${
+            connectionStatus === "connected"
+              ? "text-green-500"
+              : connectionStatus === "error"
+                ? "text-red-500"
+                : "text-yellow-500"
+          }`}
         >
           {connectionStatus}
         </span>
@@ -174,10 +173,11 @@ export default function Chat() {
               className={`mb-4 ${message.sender_type === "user" ? "text-right" : "text-left"}`}
             >
               <div
-                className={`inline-block px-4 py-2 rounded-lg ${message.sender_type === "user"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted"
-                  }`}
+                className={`inline-block px-4 py-2 rounded-lg ${
+                  message.sender_type === "user"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted"
+                }`}
               >
                 {message.content}
                 {!message.isComplete && message.sender_type === "assistant" && (
