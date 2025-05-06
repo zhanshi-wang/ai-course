@@ -2,10 +2,10 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.routers import auth
+from backend.routers import auth, chat
 from backend.routers import users
 from backend.routers import files
-from backend.routers import chat
+from backend.routers import ws
 
 
 # Configure logging
@@ -33,4 +33,5 @@ async def health_check():
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(files.router)
+app.include_router(ws.router)
 app.include_router(chat.router)
