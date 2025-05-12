@@ -169,22 +169,7 @@ export default function Chat() {
 
   return (
     <div className="flex flex-col h-full p-4">
-      <h1 className="text-2xl font-bold mb-4">Chat</h1>
-      <div className="text-sm mb-2">
-        Connection status:{" "}
-        <span
-          className={`font-semibold ${
-            connectionStatus === "connected"
-              ? "text-green-500"
-              : connectionStatus === "error"
-                ? "text-red-500"
-                : "text-yellow-500"
-          }`}
-        >
-          {connectionStatus}
-        </span>
-      </div>
-      <div className="flex-1 overflow-y-auto mb-4 border rounded-md p-4">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden mb-4 border rounded-md p-4">
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-muted-foreground">Loading messages...</p>
@@ -200,11 +185,10 @@ export default function Chat() {
               className={`mb-4 ${isUserMessage(message.content) ? "text-right" : "text-left"}`}
             >
               <div
-                className={`inline-block px-4 py-2 rounded-lg ${
-                  isUserMessage(message.content)
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted"
-                }`}
+                className={`inline-block px-4 py-2 rounded-lg ${isUserMessage(message.content)
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted"
+                  }`}
               >
                 {JSON.stringify(message.content)}
               </div>

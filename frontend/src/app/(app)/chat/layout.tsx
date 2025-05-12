@@ -80,11 +80,10 @@ export default function ChatLayout({
   }, [fetchSessions]);
 
   return (
-    <div className="flex h-full">
+    <div className="flex flex-1 w-full h-full overflow-hidden">
       {/* Sessions Sidebar */}
       <div className="w-64 border-r p-4 overflow-y-auto">
         <div className="flex flex-col h-full">
-          <h2 className="text-lg font-semibold mb-4">Chat Sessions</h2>
           <div className="flex-1 overflow-y-auto">
             {loading ? (
               <p className="text-muted-foreground text-sm">
@@ -97,11 +96,10 @@ export default function ChatLayout({
                 {sessions.map((session) => (
                   <div
                     key={session.id}
-                    className={`p-2 rounded-md cursor-pointer ${
-                      session.id === currentSessionId
-                        ? "bg-primary text-primary-foreground"
-                        : "hover:bg-muted"
-                    }`}
+                    className={`p-2 rounded-md cursor-pointer ${session.id === currentSessionId
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-muted"
+                      }`}
                     onClick={() => router.push(`/chat/${session.id}`)}
                   >
                     <div className="font-medium truncate">
@@ -126,7 +124,7 @@ export default function ChatLayout({
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 overflow-hidden">{children}</div>
+      <div className="flex-1 h-full overflow-hidden">{children}</div>
     </div>
   );
 }
