@@ -1,18 +1,11 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BACKEND_PUBLIC_WS_URL, BACKEND_PUBLIC_URL } from "@/lib/api-utils";
 import { useParams } from "next/navigation";
-
-// A more specific type for the flexible content structure
-type MessageContent = {
-  type?: string;
-  role?: string;
-  content?: string | MessageContent;
-  [key: string]: unknown;
-};
+import MessageCard, { MessageContent } from "@/components/chat/message-card";
 
 type ChatMessage = {
   id: string;
@@ -36,6 +29,7 @@ export default function Chat() {
   const { sessionId } = useParams();
 
   const isUserMessage = (content: MessageContent): boolean => {
+    // Check for normal message type with user role
     if (content?.role === "user") {
       return true;
     }
@@ -165,7 +159,48 @@ export default function Chat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  console.log(messages);
+  // Process messages to pair function calls with their outputs
+  const processedMessages = useMemo(() => {
+    const result: ChatMessage[] = [];
+    const outputMap: Record<string, ChatMessage> = {};
+
+    // First pass: collect all function call outputs
+    messages.forEach(message => {
+      if (message.content.type === 'function_call_output' && message.content.call_id) {
+        outputMap[message.content.call_id as string] = message;
+      }
+    });
+
+    // Second pass: process messages and combine function calls with outputs
+    messages.forEach(message => {
+      if (message.content.type === 'function_call' && message.content.call_id) {
+        const callId = message.content.call_id as string;
+        const output = outputMap[callId];
+
+        if (output) {
+          // Combine function call with its output
+          result.push({
+            ...message,
+            content: {
+              ...message.content,
+              output: output.content.output
+            }
+          });
+          // Mark this output as processed
+          delete outputMap[callId];
+        } else {
+          // Function call without output
+          result.push(message);
+        }
+      } else if (message.content.type !== 'function_call_output') {
+        // Include all non-function-output messages
+        result.push(message);
+      }
+    });
+
+    return result;
+  }, [messages]);
+
 
   return (
     <div className="flex flex-col h-full p-4">
@@ -174,27 +209,21 @@ export default function Chat() {
           <div className="flex items-center justify-center h-full">
             <p className="text-muted-foreground">Loading messages...</p>
           </div>
-        ) : messages.length === 0 ? (
+        ) : processedMessages.length === 0 ? (
           <p className="text-center text-muted-foreground">
             No messages yet. Start a conversation!
           </p>
         ) : (
-          messages.map((message) => (
+          processedMessages.map((message) => (
             <div
               key={message.id}
               className={`mb-4 ${isUserMessage(message.content) ? "text-right" : "text-left"}`}
             >
-              <div
-                className={`inline-block px-4 py-2 rounded-lg ${isUserMessage(message.content)
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted"
-                  }`}
-              >
-                {JSON.stringify(message.content)}
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">
-                {new Date(message.created_at).toLocaleTimeString()}
-              </div>
+              <MessageCard
+                content={message.content}
+                createdAt={message.created_at}
+                isUser={isUserMessage(message.content)}
+              />
             </div>
           ))
         )}

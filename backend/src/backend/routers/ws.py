@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import uuid
 from agents import Agent, ModelSettings, Runner, function_tool
@@ -80,7 +81,9 @@ async def ws_get_current_user(
         username: str = payload.get("sub")
         print(username)
         if username is None:
-            await manager.disconnect(websocket, status.WS_1008_POLICY_VIOLATION)
+            await manager.disconnect(
+                websocket, status.WS_1008_POLICY_VIOLATION
+            )
             return None
         token_data = TokenData(username=username)
     except jwt.InvalidTokenError:
@@ -105,11 +108,18 @@ async def get_context_from_files(query: str, user_id: str) -> str:
         user_id (str): The user's ID
 
     Returns:
-        str: The context
+        str: The context fetched from the vector DB. It's a JSON string of a
+        list of dictionaries, each containing the following keys:
+        - file_name: The name of the file
+        - page_number: The page number
+        - content: The content of the page
+        - page_image: The base64 encoded image of the page
     """
     try:
         # Search vector DB for relevant context
-        search_results = await search_vector_db(query=query, top_k=5, user_id=user_id)
+        search_results = await search_vector_db(
+            query=query, top_k=5, user_id=user_id
+        )
         logger.info(f"Search results: {search_results}")
         # Format the results as context
         if not search_results:
@@ -118,16 +128,23 @@ async def get_context_from_files(query: str, user_id: str) -> str:
         context_parts = []
         for i, result in enumerate(search_results):
             metadata = result["metadata"]
-            file_name = metadata.get("file_name", "Unknown")
+            file_id = metadata.get("file_id")
+            file_name = metadata.get("file_name")
+            page_number = metadata.get("page_number")
+
             context_parts.append(
-                f"Document: {file_name}\n" f"Content: {result['content']}\n"
+                {
+                    "file_id": file_id,
+                    "file_name": file_name,
+                    "page_number": page_number,
+                    "content": result["content"],
+                }
             )
 
-        context = "\n---\n".join(context_parts)
-        return context
+        return json.dumps(context_parts)
     except Exception as e:
         logger.error(f"Error retrieving context: {str(e)}")
-        return ""
+        return "[]"
 
 
 @router.websocket("/chat/{session_id}")
